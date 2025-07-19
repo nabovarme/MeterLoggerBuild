@@ -103,9 +103,9 @@ RUN chown -R meterlogger:meterlogger /meterlogger
 USER meterlogger
 
 # Export ENV
-ENV PATH /meterlogger/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
-ENV XTENSA_TOOLS_ROOT /meterlogger/esp-open-sdk/xtensa-lx106-elf/bin
-ENV SDK_BASE /meterlogger/esp-open-sdk/sdk
+ENV PATH=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
+ENV XTENSA_TOOLS_ROOT=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin
+ENV SDK_BASE=/meterlogger/esp-open-sdk/sdk
 
 WORKDIR /meterlogger/MeterLogger
 CMD cp /tmp/esptool/esptool.py /meterlogger/MeterLogger/tools/ && \
