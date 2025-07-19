@@ -1,0 +1,3 @@
+[submodule "MeterLogger"]
+	path = MeterLogger
+	url = https://github.com/nabovarme/MeterLogger.git
