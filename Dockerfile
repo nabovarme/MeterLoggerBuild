@@ -93,9 +93,6 @@ RUN cd /meterlogger/esp-open-sdk && \
 
 # meterlogger
 COPY MeterLogger /meterlogger/MeterLogger
-# Initialize and update any submodules inside MeterLogger
-RUN cd /meterlogger/MeterLogger && \
-	git submodule update --init --recursive
 
 RUN cd /tmp && git clone https://github.com/espressif/esptool.git && \
 	cd /tmp/esptool && git checkout 0153b796c6738bedcb06bac904502f06ff42d579
