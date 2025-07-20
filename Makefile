@@ -1,3 +1,5 @@
+.PHONY: esptool-pyz
+
 # Default target: ensure version.txt exists, update submodules, build
 all: build
 
@@ -24,9 +26,14 @@ update-submodules:
 release-dir:
 	@mkdir -p release
 
+# Ensure esptool directory exists on host
+esptool-dir:
+	@mkdir -p esptool
+
 # Build Docker image
 build:
 	docker build -t meterlogger .
+	docker build -f Dockerfile.esptool -t meterlogger-esptool .
 
 # Run container and inject GIT_VERSION as environment variable
 sh:
@@ -38,3 +45,19 @@ firmware: version.txt release-dir
 		-e GIT_VERSION=$(GIT_VERSION) \
 		-v $(CURDIR)/release:/meterlogger/MeterLogger/release \
 		meterlogger:latest make clean all $(MAKEFLAGS)
+
+# Build Docker image for esptool (you already have this)
+build-esptool-image:
+	docker build -f Dockerfile.esptool -t meterlogger-esptool .
+
+# Run container to build esptool.pyz and copy it out
+esptool-pyz: build-esptool-image esptool-dir
+	# Create a container from the image (detached)
+	docker create --name esptool-builder meterlogger-esptool
+	# Copy esptool.pyz from container to host folder
+	docker cp esptool-builder:/home/meterlogger/esptool/esptool.pyz ./esptool/
+	# Remove container
+	docker rm esptool-builder
+
+# esptool build (ensure esptool dir exists first)
+esptool: esptool-pyz
