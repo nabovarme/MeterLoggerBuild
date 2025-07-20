@@ -92,15 +92,10 @@ RUN cd /meterlogger/esp-open-sdk && \
 #RUN cd /meterlogger && wget https://github.com/littleyoda/EspStackTraceDecoder/releases/download/untagged-59a763238a6cedfe0362/EspStackTraceDecoder.jar
 
 # meterlogger
-COPY MeterLogger /meterlogger/MeterLogger
+COPY --chown=meterlogger:meterlogger MeterLogger /meterlogger/MeterLogger
 
 RUN cd /tmp && git clone https://github.com/espressif/esptool.git && \
 	cd /tmp/esptool && git checkout 0153b796c6738bedcb06bac904502f06ff42d579
-
-USER root
-RUN chown -R meterlogger:meterlogger /meterlogger
-
-USER meterlogger
 
 # Export ENV
 ENV PATH=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
