@@ -20,6 +20,10 @@ update-submodules:
 	git submodule update --init MeterLogger
 	cd MeterLogger && git checkout master && git pull origin master
 
+# Ensure release directory exists on host
+release-dir:
+	@mkdir -p release
+
 # Build Docker image
 build:
 	docker build -t meterlogger .
@@ -28,5 +32,9 @@ build:
 sh:
 	docker run -it -e GIT_VERSION=$(GIT_VERSION) meterlogger:latest /bin/bash
 
-firmware: version.txt update-submodules
-	docker run -it -e GIT_VERSION=$(GIT_VERSION) meterlogger:latest make clean all $(MAKEFLAGS) 
+# Firmware build (ensure release dir exists first)
+firmware: version.txt release-dir
+	docker run -it \
+		-e GIT_VERSION=$(GIT_VERSION) \
+		-v $(CURDIR)/release:/meterlogger/MeterLogger/release \
+		meterlogger:latest make clean all $(MAKEFLAGS)
