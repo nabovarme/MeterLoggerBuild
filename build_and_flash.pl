@@ -9,7 +9,7 @@ use Nabovarme::Db;
 use constant SERIAL_PORT => $ENV{SERIAL_PORT} || '/dev/ttyUSB0';
 use constant DOCKER_IMAGE => 'meterlogger:latest';
 use constant BUILD_COMMAND => 'make firmware';
-use constant FLASH_COMMAND => 'python3.9 ./tools/esptool.py -p ' . SERIAL_PORT . ' -b 1500000 write_flash --flash_size 1MB --flash_mode dout 0xFE000 firmware/blank.bin 0xFC000 firmware/esp_init_data_default_112th_byte_0x03.bin 0x00000 firmware/0x00000.bin 0x10000 firmware/0x10000.bin 0x60000 webpages.espfs';
+use constant FLASH_COMMAND => 'python3 ./esptool/esptool.pyz -p ' . SERIAL_PORT . ' -b 1500000 write_flash --flash_size 1MB --flash_mode dout 0xFE000 release/blank.bin 0xFC000 release/esp_init_data_default_112th_byte_0x03.bin 0x00000 release/0x00000.bin 0x10000 release/0x10000.bin 0x60000 release/webpages.espfs';
 my $DEFAULT_BUILD_VARS = 'AP=1';
 
 my $meter_serial = $ARGV[0] || '9999999';
