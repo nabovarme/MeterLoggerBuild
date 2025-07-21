@@ -94,9 +94,6 @@ RUN cd /meterlogger/esp-open-sdk && \
 # meterlogger
 COPY --chown=meterlogger:meterlogger MeterLogger /meterlogger/MeterLogger
 
-RUN cd /tmp && git clone https://github.com/espressif/esptool.git && \
-	cd /tmp/esptool && git checkout 0153b796c6738bedcb06bac904502f06ff42d579
-
 # Export ENV
 ENV PATH=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
 ENV XTENSA_TOOLS_ROOT=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin
@@ -106,7 +103,5 @@ WORKDIR /meterlogger/MeterLogger
 
 RUN mkdir release
 
-CMD cp /tmp/esptool/esptool.py /meterlogger/MeterLogger/tools/ && \
-	cp -a /tmp/esptool/esptool /meterlogger/MeterLogger/tools/ && \
-	cd /meterlogger/MeterLogger && \
+CMD cd /meterlogger/MeterLogger && \
 	eval $BUILD_ENV make clean all
