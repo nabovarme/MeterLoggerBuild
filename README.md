@@ -19,12 +19,39 @@ This repository automates:
 
 ---
 
+## ⚙️ Setup and Build
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/nabovarme/MeterLoggerBuild.git
+cd MeterLoggerBuild
+```
+
+2. **Update submodules:**
+```bash
+make update-submodules
+```
+
+3. **Build toolchain and environment:**
+```bash
+make build
+```
+
+4. **Build the firmware:**
+```bash
+make firmware AP=1 NO_CRON=1 DEBUG_STACK_TRACE=1 MC_66B=1 SERIAL=YOUR_SERIAL_HERE
+```
+
+> Running `make build` will automatically download, build, and set up the Xtensa compiler toolchain and ESP8266 SDK prerequisites needed for firmware compilation.
+
+---
+
 ## 🔄 How It Works
 
 1. The `Makefile` builds the firmware files and helper binaries, placing them in the `release/` directory. The main firmware files are:
    - `release/0x00000.bin`
    - `release/0x10000.bin`
-   
+
    Additional helper files include:
    - `release/blank.bin`
    - `release/esp_init_data_default_112th_byte_0x03.bin`
@@ -33,8 +60,15 @@ This repository automates:
 2. The build process also runs the `Dockerfile.esptool` to produce a fresh, version-pinned `esptool.pyz` — a portable, self-contained flasher utility.
 
 3. You can then use `esptool.pyz` to flash the firmware to your ESP8266 device, specifying the appropriate addresses for each binary. For example:
-   ```bash
-   python3 esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 release/0x00000.bin 0x10000 release/0x10000.bin <-- DEBUG
+
+```bash
+./esptool/esptool.pyz -p /dev/tty.usbserial-A9M9DV3R -b 1500000 write_flash --flash_size 1MB --flash_mode dout \
+  0xFE000 release/blank.bin \
+  0xFC000 release/esp_init_data_default_112th_byte_0x03.bin \
+  0x00000 release/0x00000.bin \
+  0x10000 release/0x10000.bin \
+  0x60000 release/webpages.espfs
+```
 
 ---
 
@@ -54,7 +88,7 @@ make all
 
 ### 3. Flash Your ESP8266
 ```bash
-make flash PORT=/dev/ttyUSB0 <-- DEBUG
+make flash PORT=/dev/ttyUSB0
 ```
 This uses the `esptool.pyz` created during the build, so no extra installs are needed.
 
@@ -64,7 +98,7 @@ make esptool
 ```
 After this, you can manually flash with:
 ```bash
-python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin <-- DEBUG
+python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin
 ```
 
 ---
@@ -76,6 +110,7 @@ python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin <-
 - `make esptool` – Build only `esptool.pyz`
 - `make flash PORT=/dev/ttyUSBX` – Flash the device using the built `esptool.pyz`
 - `make clean` – Remove build artifacts
+- `make update-submodules` – Update all git submodules to correct versions
 
 ---
 
