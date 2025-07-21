@@ -21,13 +21,20 @@ This repository automates:
 
 ## 🔄 How It Works
 
-1. The `Makefile` builds the firmware (`firmware.bin`) and also:
-   - Runs `Dockerfile.esptool` to produce a fresh, version-pinned `esptool.pyz`.
-2. The `esptool.pyz` can be used anywhere to flash firmware:
+1. The `Makefile` builds the firmware files and helper binaries, placing them in the `release/` directory. The main firmware files are:
+   - `release/0x00000.bin`
+   - `release/0x10000.bin`
+   
+   Additional helper files include:
+   - `release/blank.bin`
+   - `release/esp_init_data_default_112th_byte_0x03.bin`
+   - `release/webpages.espfs`
+
+2. The build process also runs the `Dockerfile.esptool` to produce a fresh, version-pinned `esptool.pyz` — a portable, self-contained flasher utility.
+
+3. You can then use `esptool.pyz` to flash the firmware to your ESP8266 device, specifying the appropriate addresses for each binary. For example:
    ```bash
-   python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 firmware.bin
-   ```
-3. All steps are automated via `make` targets so you don’t need to deal with Docker or Python environments manually.
+   python3 esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 release/0x00000.bin 0x10000 release/0x10000.bin <-- DEBUG
 
 ---
 
@@ -47,7 +54,7 @@ make all
 
 ### 3. Flash Your ESP8266
 ```bash
-make flash PORT=/dev/ttyUSB0
+make flash PORT=/dev/ttyUSB0 <-- DEBUG
 ```
 This uses the `esptool.pyz` created during the build, so no extra installs are needed.
 
@@ -57,7 +64,7 @@ make esptool
 ```
 After this, you can manually flash with:
 ```bash
-python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin
+python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin <-- DEBUG
 ```
 
 ---
