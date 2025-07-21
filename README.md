@@ -86,19 +86,36 @@ This compiles the firmware **and** packages `esptool.pyz`:
 make all
 ```
 
-### 3. Flash Your ESP8266
+### 3. Build and Flash Your ESP8266 Firmware
+
+First, build the firmware with any required parameters. For example:
+
+```bash
+make firmware AP=1 NO_CRON=1 DEBUG_STACK_TRACE=1 MC_66B=1 SERIAL=YOUR_SERIAL_HERE
+```
+
+- Replace `YOUR_SERIAL_HERE` with your specific device serial number or identifier.
+- You can also enable other build options such as:
+  - `EN61107=1` – Support for Kamstrup EN61107 protocol
+  - `DEBUG=1` – Enable debugging output  
+- See the [MeterLogger repository](https://github.com/nabovarme/MeterLogger) for the full list of available build flags and their descriptions.
+
+After building, flash the firmware to your ESP8266 device:
+
 ```bash
 make flash PORT=/dev/ttyUSB0
 ```
-This uses the `esptool.pyz` created during the build, so no extra installs are needed.
+
+This uses the generated `esptool.pyz` and flashes all necessary binaries (including `blank.bin`, `esp_init_data_default_112th_byte_0x03.bin`, `0x00000.bin`, `0x10000.bin`, and `webpages.espfs`) to the correct addresses automatically.  
+No extra software installation is required beyond Python 3.
 
 ### 4. (Optional) Build Just the Flasher
 ```bash
 make esptool
 ```
-After this, you can manually flash with:
+After this, you can use make flash or manually flash with:
 ```bash
-python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin
+python esptool.pyz --port /dev/ttyUSB0 write_flash ...
 ```
 
 ---
@@ -109,7 +126,8 @@ python esptool.pyz --port /dev/ttyUSB0 write_flash 0x00000 build/firmware.bin
 - `make firmware` – Build only the firmware
 - `make esptool` – Build only `esptool.pyz`
 - `make flash PORT=/dev/ttyUSBX` – Flash the device using the built `esptool.pyz`
-- `make clean` – Remove build artifacts
+- `make erase_flash PORT=/dev/ttyUSBX` – Fully erase the flash memory of the connected ESP8266
+- `make clean` – Remove build containers
 - `make update-submodules` – Update all git submodules to correct versions
 
 ---
@@ -121,7 +139,7 @@ The MeterLogger firmware:
 - Publishes data securely via **AES-128 CBC encryption + HMAC-SHA256 authentication** over MQTT
 - Runs on **ESP8266 (NodeMCU, etc.)**
 
-See [MeterLogger](https://github.com/nabovarme/MeterLogger) for full firmware documentation and supported build flags (e.g., `EN61107=1`, `IMPULSE=1`, `DEBUG=1`).
+See [MeterLogger](https://github.com/nabovarme/MeterLogger) for full firmware documentation and supported build flags (e.g., `EN61107=1`, `DEBUG=1`).
 
 ---
 

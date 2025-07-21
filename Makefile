@@ -1,4 +1,4 @@
-.PHONY: all build firmware sh build-esptool-image clean-containers
+.PHONY: all build firmware sh build-esptool-image clean-containers flash erase_flash
 
 # Default target: build everything (only rebuild esptool.pyz if needed)
 all: esptool build
@@ -68,3 +68,28 @@ clean-containers:
 	-docker rm -f esptool-builder 2>/dev/null || true
 	# Optional: remove *all* stopped containers
 	-docker ps -aq -f status=exited | xargs -r docker rm
+
+# Flash and erase targets
+PORT ?= /dev/ttyUSB0
+BAUD ?= 1500000
+
+FLASH_CMD = ./esptool/esptool.pyz -p $(PORT) -b $(BAUD) write_flash --flash_size 1MB --flash_mode dout \
+  0xFE000 release/blank.bin \
+  0xFC000 release/esp_init_data_default_112th_byte_0x03.bin \
+  0x00000 release/0x00000.bin \
+  0x10000 release/0x10000.bin \
+  0x60000 release/webpages.espfs
+
+flash:
+	@if [ ! -f ./esptool/esptool.pyz ]; then \
+		echo "esptool.pyz not found. Run 'make esptool' first."; \
+		exit 1; \
+	fi
+	$(FLASH_CMD)
+
+erase_flash:
+	@if [ ! -f ./esptool/esptool.pyz ]; then \
+		echo "esptool.pyz not found. Run 'make esptool' first."; \
+		exit 1; \
+	fi
+	./esptool/esptool.pyz -p $(PORT) erase_flash
