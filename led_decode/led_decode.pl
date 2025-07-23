@@ -190,17 +190,49 @@ for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
 }
 print "Symbol bits: ", join('',@bits), "\n" if $debug;
 
-# --- Step: Find preamble (10101010) ---
-my @preamble=(1,0,1,0,1,0,1,0);
-my $start=-1;
-for my $i (0..$#bits-7){
-	if (join('',@bits[$i..$i+7]) eq '10101010'){ $start=$i+8; last; }
-}
-die "Preamble not found!\n" if $start==-1;
-print "Preamble found at index $start (payload starts)\n" if $debug;
+# --- Step: Find and remove preamble (10101010) before Manchester decoding ---
+my @preamble = (1,0,1,0,1,0,1,0);
+my $preamble_len = scalar @preamble;
+my $start = -1;
 
-# --- Step: Extract payload bits ---
-my @payload = @bits[$start..$#bits];
+for my $i (0..$#bits - $preamble_len + 1) {
+	my $match = 1;
+	for my $j (0..$preamble_len-1) {
+		if ($bits[$i+$j] != $preamble[$j]) {
+			$match = 0;
+			last;
+		}
+	}
+	if ($match) {
+		$start = $i + $preamble_len;  # Start after preamble
+		last;
+	}
+}
+die "Preamble not found in symbol bits!\n" if $start == -1;
+
+my @payload_bits = @bits[$start..$#bits];
+print "Preamble found at index $start - bits after preamble extracted\n" if $debug;
+
+# --- Manchester decoding subroutine ---
+sub manchester_decode {
+	my @encoded = @_;
+	die "Manchester encoded bits length must be even\n" if @encoded % 2 != 0;
+	my @decoded;
+	for (my $i=0; $i < @encoded; $i += 2) {
+		my ($a, $b) = @encoded[$i, $i+1];
+		if ($a == 0 && $b == 1) {
+			push @decoded, 0;
+		} elsif ($a == 1 && $b == 0) {
+			push @decoded, 1;
+		} else {
+			die "Invalid Manchester code: bits $a$b at position $i\n";
+		}
+	}
+	return @decoded;
+}
+
+my @manchester_bits = manchester_decode(@payload_bits);
+print "Manchester decoded bits: ", join('',@manchester_bits), "\n" if $debug;
 
 # --- Hamming(7,4) decode ---
 sub hamming74_decode {
@@ -214,17 +246,12 @@ sub hamming74_decode {
 }
 
 my @nibbles;
-for (my $i=0;$i+6<@payload;$i+=7){
-	push @nibbles, join('',hamming74_decode(@payload[$i..$i+6]));
+for (my $i=0; $i + 6 < @manchester_bits; $i += 7) {
+	push @nibbles, join('', hamming74_decode(@manchester_bits[$i..$i+6]));
 }
 
-# Combine nibbles into bytes
-my @bytes;
-for (my $i=0;$i+1<@nibbles;$i+=2){
-	my $hi=oct("0b$nibbles[$i]");
-	my $lo=oct("0b$nibbles[$i+1]");
-	push @bytes, chr(($hi<<4)|$lo);
-}
-print "Decoded string: ", join('',@bytes), "\n";
+# Combine nibbles as needed (example: convert to hex)
+my $decoded_data = join('', map { sprintf("%X", oct("0b$_")) } @nibbles);
+print "Decoded data (hex nibbles): $decoded_data\n" if $debug;
 
-print "Processing complete.\n";
+# End of script
