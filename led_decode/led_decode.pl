@@ -185,8 +185,21 @@ print "Detected frames_per_bit=$frames_per_bit (~".($fps/$frames_per_bit)." bps)
 my @bits;
 for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
 	my $ones=0; my $tot=0;
-	for my $j ($i..$i+$frames_per_bit-1){ last if $j>$#raw_bits; $ones+=$raw_bits[$j];$tot++; }
-	push @bits, ($ones>$tot/2)?1:0;
+	my @segment;
+	for my $j ($i..$i+$frames_per_bit-1){
+		last if $j>$#raw_bits;
+		$ones+=$raw_bits[$j];
+		push @segment, $raw_bits[$j];
+		$tot++;
+	}
+	my $bit = ($ones>$tot/2)?1:0;
+	push @bits, $bit;
+
+	# Print debug info per bit
+	if ($debug) {
+		printf "Bit %d (frames %d-%d): raw=%s → %d\n",
+			scalar(@bits)-1, $i, $i+$tot-1, join('',@segment), $bit;
+	}
 }
 print "Symbol bits: ", join('',@bits), "\n" if $debug;
 
