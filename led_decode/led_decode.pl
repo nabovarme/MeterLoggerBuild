@@ -12,7 +12,6 @@ my $search_margin = 20;
 my $debug	   = 1;
 my $bit_smooth_window = 0;
 my $brightness_smooth_window = 5;
-my $frames_per_bit_override;  # new option
 
 # --- Arguments ---
 my $video_file;
@@ -22,13 +21,11 @@ while (@ARGV) {
 		$bit_smooth_window = shift @ARGV // 0;
 	} elsif ($arg eq '--smooth') {
 		$brightness_smooth_window = shift @ARGV // 5;
-	} elsif ($arg eq '--frames-per-bit') {
-		$frames_per_bit_override = shift @ARGV;
 	} else {
 		$video_file = $arg;
 	}
 }
-die "Usage: $0 <video_file> [--smooth N] [--bit-smooth N] [--frames-per-bit N]\n" unless $video_file;
+die "Usage: $0 <video_file> [--smooth N] [--bit-smooth N]\n" unless $video_file;
 
 # --- Step 0: Detect FPS ---
 my $ffprobe = "/opt/local/bin/ffprobe";
@@ -135,35 +132,56 @@ print "Auto threshold: min=$min_v max=$max_v thr=$thr\n" if $debug;
 my @raw_bits = map { $_>$thr?1:0 } @smoothed;
 print "Frame-level bits: ", join('',@raw_bits), "\n" if $debug;
 
-# Frames per bit (autodetect unless overridden)
-my $frames_per_bit;
-if ($frames_per_bit_override) {
-	$frames_per_bit = $frames_per_bit_override;
-	print "Using frames_per_bit=$frames_per_bit (manual)\n" if $debug;
-} else {
-	sub autocorr {
-		my ($d,$lag)=@_;
-		my $n=@$d;
-		return 0 if $lag<=0||$lag>=$n;
-		my $mean=0; $mean+=$_ for @$d; $mean/=$n;
-		my ($num,$den)=(0,0);
-		for(my $i=0;$i<$n-$lag;$i++){
-			$num+=($d->[$i]-$mean)*($d->[$i+$lag]-$mean);
-			$den+=($d->[$i]-$mean)**2;
+# --- Detect frames_per_bit using preamble 10101010 ---
+sub detect_frames_per_bit_from_preamble {
+	my ($bits_ref) = @_;
+	my @bits = @$bits_ref;
+
+	# Find longest run of 10101010 in raw bits (allow ~20% mismatch per symbol)
+	my $best_start = -1;
+	my $best_len = 0;
+	for my $i (0..$#bits-80) {  # search 80 frames at a time
+		my $window = join('', @bits[$i..$i+79]);
+		my $ones = ($window =~ tr/1//);
+		my $zeros = ($window =~ tr/0//);
+		# Look for a balanced mix, not flatline
+		if ($ones > 30 && $zeros > 30) {
+			if (length($window) > $best_len) {
+				$best_len = length($window);
+				$best_start = $i;
+			}
 		}
-		return $den==0?0:$num/$den;
 	}
-	my $maxlag=int($fps/2);
-	my ($bestlag,$bestcorr)=(1,-1);
-	for my $lag (1..$maxlag) {
-		my $c=autocorr(\@smoothed,$lag);
-		if ($c>$bestcorr){$bestcorr=$c;$bestlag=$lag;}
+	die "Could not detect preamble region!\n" if $best_start < 0;
+
+	# Measure edge distances in that region
+	my @edges;
+	my $last = $bits[$best_start];
+	for my $i ($best_start..$best_start+$best_len-1) {
+		if ($bits[$i] != $last) {
+			push @edges, $i;
+			$last = $bits[$i];
+		}
 	}
-	$frames_per_bit=$bestlag;
-	print "Auto frames_per_bit=$frames_per_bit (~".($fps/$frames_per_bit)." bps)\n" if $debug;
+	die "No edges in preamble!\n" unless @edges > 1;
+
+	my @periods;
+	for (my $j=1;$j<@edges;$j++) {
+		push @periods, $edges[$j]-$edges[$j-1];
+	}
+
+	# Average period with slack (ignore outliers ±20%)
+	my $mean = 0; $mean+=$_ for @periods; $mean /= @periods;
+	my @valid = grep { $_ > 0.8*$mean && $_ < 1.2*$mean } @periods;
+	$mean = 0; $mean+=$_ for @valid; $mean /= @valid;
+
+	return int($mean+0.5);
 }
 
-# Collapse to bit stream (majority vote)
+my $frames_per_bit = detect_frames_per_bit_from_preamble(\@raw_bits);
+print "Detected frames_per_bit=$frames_per_bit (~".($fps/$frames_per_bit)." bps)\n" if $debug;
+
+# --- Collapse to bit stream (majority vote) ---
 my @bits;
 for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
 	my $ones=0; my $tot=0;
