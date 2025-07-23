@@ -2,3 +2,5 @@
 .DS_Store
 version.txt
 release/*
+led_decode/*.MOV
+led_decode/*.mp4
