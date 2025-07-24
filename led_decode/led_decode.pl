@@ -137,14 +137,12 @@ sub detect_frames_per_bit_from_preamble {
 	my ($bits_ref) = @_;
 	my @bits = @$bits_ref;
 
-	# Find longest run of 10101010 in raw bits (allow ~20% mismatch per symbol)
 	my $best_start = -1;
 	my $best_len = 0;
-	for my $i (0..$#bits-80) {  # search 80 frames at a time
+	for my $i (0..$#bits-80) {
 		my $window = join('', @bits[$i..$i+79]);
 		my $ones = ($window =~ tr/1//);
 		my $zeros = ($window =~ tr/0//);
-		# Look for a balanced mix, not flatline
 		if ($ones > 30 && $zeros > 30) {
 			if (length($window) > $best_len) {
 				$best_len = length($window);
@@ -154,7 +152,6 @@ sub detect_frames_per_bit_from_preamble {
 	}
 	die "Could not detect preamble region!\n" if $best_start < 0;
 
-	# Measure edge distances in that region
 	my @edges;
 	my $last = $bits[$best_start];
 	for my $i ($best_start..$best_start+$best_len-1) {
@@ -170,7 +167,6 @@ sub detect_frames_per_bit_from_preamble {
 		push @periods, $edges[$j]-$edges[$j-1];
 	}
 
-	# Average period with slack (ignore outliers ±20%)
 	my $mean = 0; $mean+=$_ for @periods; $mean /= @periods;
 	my @valid = grep { $_ > 0.8*$mean && $_ < 1.2*$mean } @periods;
 	$mean = 0; $mean+=$_ for @valid; $mean /= @valid;
@@ -181,9 +177,33 @@ sub detect_frames_per_bit_from_preamble {
 my $frames_per_bit = detect_frames_per_bit_from_preamble(\@raw_bits);
 print "Detected frames_per_bit=$frames_per_bit (~".($fps/$frames_per_bit)." bps)\n" if $debug;
 
-# --- Collapse to bit stream (majority vote) ---
+# --- Find preamble start and compute payload frame offset ---
+my @preamble_pattern = (1,0,1,0,1,0,1,0);
+my $preamble_len_bits = scalar @preamble_pattern;
+
+my $preamble_start_frame = -1;
+for my $i (0..$#raw_bits - $preamble_len_bits*$frames_per_bit) {
+    my $match = 1;
+    for my $j (0..$preamble_len_bits-1) {
+        my $seg_start = $i + $j*$frames_per_bit;
+        my $seg_end   = $seg_start + $frames_per_bit - 1;
+        $seg_end = $#raw_bits if $seg_end > $#raw_bits;
+
+        my $ones=0; $ones+=$raw_bits[$_] for $seg_start..$seg_end;
+        my $bit = ($ones > ($seg_end-$seg_start+1)/2) ? 1 : 0;
+        if ($bit != $preamble_pattern[$j]) { $match=0; last; }
+    }
+    if ($match) { $preamble_start_frame = $i; last; }
+}
+die "Preamble not found in raw frames!\n" if $preamble_start_frame < 0;
+
+# Align payload start (center first bit)
+my $data_start_frame = $preamble_start_frame + $preamble_len_bits*$frames_per_bit + int($frames_per_bit/2);
+print "Preamble detected: frames $preamble_start_frame-".($data_start_frame-1)." skipped (includes half-bit centering), data starts at frame $data_start_frame\n" if $debug;
+
+# --- Collapse to bit stream from data_start_frame ---
 my @bits;
-for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
+for (my $i=$data_start_frame;$i<@raw_bits;$i+=$frames_per_bit){
 	my $ones=0; my $tot=0;
 	my @segment;
 	for my $j ($i..$i+$frames_per_bit-1){
@@ -195,7 +215,6 @@ for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
 	my $bit = ($ones>$tot/2)?1:0;
 	push @bits, $bit;
 
-	# Print debug info per bit
 	if ($debug) {
 		printf "Bit %d (frames %d-%d): raw=%s → %d\n",
 			scalar(@bits)-1, $i, $i+$tot-1, join('',@segment), $bit;
@@ -203,30 +222,7 @@ for (my $i=0;$i<@raw_bits;$i+=$frames_per_bit){
 }
 print "Symbol bits: ", join('',@bits), "\n" if $debug;
 
-# --- Step: Find and remove preamble (10101010) before Manchester decoding ---
-my @preamble = (1,0,1,0,1,0,1,0);
-my $preamble_len = scalar @preamble;
-my $start = -1;
-
-for my $i (0..$#bits - $preamble_len + 1) {
-	my $match = 1;
-	for my $j (0..$preamble_len-1) {
-		if ($bits[$i+$j] != $preamble[$j]) {
-			$match = 0;
-			last;
-		}
-	}
-	if ($match) {
-		$start = $i + $preamble_len;  # Start after preamble
-		last;
-	}
-}
-die "Preamble not found in symbol bits!\n" if $start == -1;
-
-my @payload_bits = @bits[$start..$#bits];
-print "Preamble found at index $start - bits after preamble extracted\n" if $debug;
-
-# --- Manchester decoding subroutine ---
+# --- Manchester decoding ---
 sub manchester_decode {
 	my @encoded = @_;
 	die "Manchester encoded bits length must be even\n" if @encoded % 2 != 0;
@@ -244,7 +240,7 @@ sub manchester_decode {
 	return @decoded;
 }
 
-my @manchester_bits = manchester_decode(@payload_bits);
+my @manchester_bits = manchester_decode(@bits);
 print "Manchester decoded bits: ", join('',@manchester_bits), "\n" if $debug;
 
 # --- Hamming(7,4) decode ---
@@ -263,7 +259,6 @@ for (my $i=0; $i + 6 < @manchester_bits; $i += 7) {
 	push @nibbles, join('', hamming74_decode(@manchester_bits[$i..$i+6]));
 }
 
-# Combine nibbles as needed (example: convert to hex)
 my $decoded_data = join('', map { sprintf("%X", oct("0b$_")) } @nibbles);
 print "Decoded data (hex nibbles): $decoded_data\n" if $debug;
 
