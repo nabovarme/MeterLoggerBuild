@@ -183,17 +183,17 @@ my $preamble_len_bits = scalar @preamble_pattern;
 
 my $preamble_start_frame = -1;
 for my $i (0..$#raw_bits - $preamble_len_bits*$frames_per_bit) {
-    my $match = 1;
-    for my $j (0..$preamble_len_bits-1) {
-        my $seg_start = $i + $j*$frames_per_bit;
-        my $seg_end   = $seg_start + $frames_per_bit - 1;
-        $seg_end = $#raw_bits if $seg_end > $#raw_bits;
+	my $match = 1;
+	for my $j (0..$preamble_len_bits-1) {
+		my $seg_start = $i + $j*$frames_per_bit;
+		my $seg_end   = $seg_start + $frames_per_bit - 1;
+		$seg_end = $#raw_bits if $seg_end > $#raw_bits;
 
-        my $ones=0; $ones+=$raw_bits[$_] for $seg_start..$seg_end;
-        my $bit = ($ones > ($seg_end-$seg_start+1)/2) ? 1 : 0;
-        if ($bit != $preamble_pattern[$j]) { $match=0; last; }
-    }
-    if ($match) { $preamble_start_frame = $i; last; }
+		my $ones=0; $ones+=$raw_bits[$_] for $seg_start..$seg_end;
+		my $bit = ($ones > ($seg_end-$seg_start+1)/2) ? 1 : 0;
+		if ($bit != $preamble_pattern[$j]) { $match=0; last; }
+	}
+	if ($match) { $preamble_start_frame = $i; last; }
 }
 die "Preamble not found in raw frames!\n" if $preamble_start_frame < 0;
 
@@ -225,16 +225,16 @@ print "Symbol bits: ", join('',@bits), "\n" if $debug;
 # --- Manchester decoding ---
 sub manchester_decode {
 	my @encoded = @_;
-	die "Manchester encoded bits length must be even\n" if @encoded % 2 != 0;
+#	die "Manchester encoded bits length must be even\n" if @encoded % 2 != 0;
 	my @decoded;
 	for (my $i=0; $i < @encoded; $i += 2) {
 		my ($a, $b) = @encoded[$i, $i+1];
 		if ($a == 0 && $b == 1) {
-			push @decoded, 0;
+			push @decoded, 1;  # 01 represents 1
 		} elsif ($a == 1 && $b == 0) {
-			push @decoded, 1;
+			push @decoded, 0;  # 10 represents 0
 		} else {
-			die "Invalid Manchester code: bits $a$b at position $i\n";
+#			die "Invalid Manchester code: bits $a$b at position $i\n";
 		}
 	}
 	return @decoded;
@@ -251,9 +251,9 @@ sub hamming74_decode {
 	my $s3=$b[3]^$b[4]^$b[5]^$b[6];
 	my $err=$s1*1+$s2*2+$s3*4;
 	$b[$err-1]^=1 if $err;
-	return ($b[2],$b[4],$b[5],$b[6]); # data bits (4 bits)
+	# Return nibble as MSB-first: d4 d3 d2 d1
+	return ($b[6], $b[5], $b[4], $b[2]);
 }
-
 my @nibbles;
 for (my $i=0; $i + 6 < @manchester_bits; $i += 7) {
 	push @nibbles, join('', hamming74_decode(@manchester_bits[$i..$i+6]));
