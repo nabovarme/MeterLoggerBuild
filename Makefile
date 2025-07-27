@@ -93,3 +93,11 @@ erase_flash:
 		exit 1; \
 	fi
 	./esptool/esptool.pyz -p $(PORT) erase_flash
+
+getstacktrace:
+	@if [ ! -f ./esptool/esptool.pyz ]; then \
+		echo "esptool.pyz not found. Run 'make esptool' first."; \
+		exit 1; \
+	fi
+	./esptool/esptool.pyz -p $(PORT) read_flash 0x80000 0x4000 stack_trace.dump
+	
