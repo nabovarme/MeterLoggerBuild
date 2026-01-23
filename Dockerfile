@@ -101,7 +101,7 @@ ENV SDK_BASE=/meterlogger/esp-open-sdk/sdk
 
 WORKDIR /meterlogger/MeterLogger
 
-RUN mkdir release
+RUN mkdir -p release
 
 CMD cd /meterlogger/MeterLogger && \
 	eval $BUILD_ENV make clean all
