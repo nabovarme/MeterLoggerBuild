@@ -58,14 +58,8 @@ RUN apt-get update && apt-get install -y \
 	splint \
 	sudo \
 	screen \
-	software-properties-common
-
-# Java
-#RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EA8CACC073C3DB2A
-#RUN echo "deb http://ppa.launchpad.net/linuxuprising/java/ubuntu bionic main" > /etc/apt/sources.list.d/linuxuprising-java.list && apt-get update
-#RUN echo oracle-java15-installer shared/accepted-oracle-license-v1-2 select true | sudo /usr/bin/debconf-set-selections
-#RUN echo oracle-java15-installer shared/accepted-oracle-licence-v1-2 boolean true | sudo /usr/bin/debconf-set-selections
-#RUN apt-get install -y --allow-unauthenticated oracle-java16-set-default
+	software-properties-common \
+	esptool
 
 # Adduser `meterlogger`
 RUN perl -pi -e 's/^#?\%sudo\W+ALL=\(ALL\:ALL\)\W+ALL/\%sudo\tALL=\(ALL\:ALL\) NOPASSWD\: ALL/' /etc/sudoers
@@ -88,11 +82,9 @@ RUN cd /meterlogger/esp-open-sdk && git clone https://github.com/nabovarme/esp-o
 RUN cd /meterlogger/esp-open-sdk && \
 	make STANDALONE=y
 
-# EspStackTraceDecoder.jar
-#RUN cd /meterlogger && wget https://github.com/littleyoda/EspStackTraceDecoder/releases/download/untagged-59a763238a6cedfe0362/EspStackTraceDecoder.jar
-
 # meterlogger
-COPY --chown=meterlogger:meterlogger MeterLogger /meterlogger/MeterLogger
+RUN cd /meterlogger && git clone https://github.com/nabovarme/MeterLogger && \
+	cd /meterlogger/MeterLogger && git checkout dev_build_server
 
 # Export ENV
 ENV PATH=/meterlogger/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
@@ -103,5 +95,7 @@ WORKDIR /meterlogger/MeterLogger
 
 RUN mkdir -p release
 
-CMD cd /meterlogger/MeterLogger && \
-	eval $BUILD_ENV make clean all
+#CMD cd /meterlogger/MeterLogger && \
+#	eval $BUILD_ENV make clean all
+
+CMD cat /dev/zero > /dev/null

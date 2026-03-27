@@ -13,3 +13,8 @@ services:
     depends_on:
       - firmware-builder
     restart: unless-stopped
+
+networks:
+  default:
+    name: meterlogger-net
+    external: true
