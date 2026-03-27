@@ -101,7 +101,6 @@ getstacktrace:
 	fi
 	./esptool/esptool.pyz -p $(PORT) read_flash 0x80000 0x4000 stack_trace.dump
 
-# --- NEW TARGET: merged firmware ---
 meterlogger.bin: release-dir esptool/esptool.pyz \
 	release/0x00000.bin \
 	release/0x10000.bin \
