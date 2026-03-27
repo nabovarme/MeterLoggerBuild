@@ -1,4 +1,4 @@
-.PHONY: all build firmware sh build-esptool-image clean-containers flash erase_flash
+.PHONY: all build firmware sh build-esptool-image clean-containers flash erase_flash build-merged
 
 # Default target: build everything (only rebuild esptool.pyz if needed)
 all: esptool build
@@ -100,4 +100,24 @@ getstacktrace:
 		exit 1; \
 	fi
 	./esptool/esptool.pyz -p $(PORT) read_flash 0x80000 0x4000 stack_trace.dump
-	
+
+# --- NEW TARGET: merged firmware ---
+meterlogger.bin: release-dir esptool/esptool.pyz \
+	release/0x00000.bin \
+	release/0x10000.bin \
+	release/webpages.espfs \
+	release/esp_init_data_default_112th_byte_0x03.bin \
+	release/blank.bin
+	@echo "Creating meterlogger.bin..."
+	./esptool/esptool.pyz --chip esp8266 merge_bin \
+		-o meterlogger.bin \
+		--flash_mode dout \
+		--flash_size 1MB \
+		0x00000 release/0x00000.bin \
+		0x10000 release/0x10000.bin \
+		0x60000 release/webpages.espfs \
+		0xFC000 release/esp_init_data_default_112th_byte_0x03.bin \
+		0xFE000 release/blank.bin
+
+# convenience target
+build-merged: meterlogger.bin
