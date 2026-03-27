@@ -1,4 +1,4 @@
-.PHONY: all build firmware sh build-esptool-image clean-containers flash erase_flash build-merged
+.PHONY: all build firmware sh build-esptool-image clean-containers flash erase_flash
 
 # Default target: build everything (only rebuild esptool.pyz if needed)
 all: esptool build
@@ -37,17 +37,14 @@ build-esptool-image: Dockerfile.esptool
 # Build esptool.pyz (only if missing or inputs changed)
 esptool/esptool.pyz: build-esptool-image esptool-dir $(shell find esptool -type f) Dockerfile.esptool
 	@echo "Building esptool.pyz..."
-	# Create a container from the image (detached)
 	docker create --name esptool-builder meterlogger-esptool
-	# Copy esptool.pyz from container to host folder
 	docker cp esptool-builder:/home/meterlogger/esptool/esptool.pyz ./esptool/
-	# Remove container
 	docker rm esptool-builder
 
 # Meta target to depend on the actual file
 esptool: esptool/esptool.pyz
 
-# Build main Docker images (doesn't rebuild esptool.pyz unnecessarily)
+# Build main Docker images
 build:
 	docker build -t meterlogger .
 
@@ -55,18 +52,28 @@ build:
 sh:
 	docker run -it -e GIT_VERSION=$(GIT_VERSION) meterlogger:latest /bin/bash
 
-# Firmware build (ensure release dir exists first)
-firmware: version.txt release-dir
+# Firmware build (Docker step + hidden merge step)
+firmware: version.txt release-dir esptool/esptool.pyz
 	docker run -it \
 		-e GIT_VERSION=$(GIT_VERSION) \
 		-v $(CURDIR)/release:/meterlogger/MeterLogger/release \
 		meterlogger:latest make clean all $(MAKEFLAGS)
+	@echo "Merging firmware into release/meterlogger.bin..."
+	@./esptool/esptool.pyz --chip esp8266 merge_bin \
+		-o release/meterlogger.bin \
+		--flash_mode dout \
+		--flash_size 1MB \
+		0x00000 release/0x00000.bin \
+		0x10000 release/0x10000.bin \
+		0x60000 release/webpages.espfs \
+		0xFC000 release/esp_init_data_default_112th_byte_0x03.bin \
+		0xFE000 release/blank.bin \
+		> /dev/null
 
-# Remove leftover containers (including esptool-builder)
+# Remove leftover containers
 clean-containers:
 	@echo "Cleaning up stopped containers..."
 	-docker rm -f esptool-builder 2>/dev/null || true
-	# Optional: remove *all* stopped containers
 	-docker ps -aq -f status=exited | xargs -r docker rm
 
 # Flash and erase targets
@@ -100,23 +107,3 @@ getstacktrace:
 		exit 1; \
 	fi
 	./esptool/esptool.pyz -p $(PORT) read_flash 0x80000 0x4000 stack_trace.dump
-
-meterlogger.bin: release-dir esptool/esptool.pyz \
-	release/0x00000.bin \
-	release/0x10000.bin \
-	release/webpages.espfs \
-	release/esp_init_data_default_112th_byte_0x03.bin \
-	release/blank.bin
-	@echo "Creating meterlogger.bin..."
-	./esptool/esptool.pyz --chip esp8266 merge_bin \
-		-o meterlogger.bin \
-		--flash_mode dout \
-		--flash_size 1MB \
-		0x00000 release/0x00000.bin \
-		0x10000 release/0x10000.bin \
-		0x60000 release/webpages.espfs \
-		0xFC000 release/esp_init_data_default_112th_byte_0x03.bin \
-		0xFE000 release/blank.bin
-
-# convenience target
-build-merged: meterlogger.bin

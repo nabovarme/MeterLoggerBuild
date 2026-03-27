@@ -5,3 +5,4 @@ release/*
 led_decode/*.MOV
 led_decode/*.mp4
 stack_trace.dump
+*.bin
