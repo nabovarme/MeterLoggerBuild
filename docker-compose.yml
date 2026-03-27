@@ -1,0 +1,15 @@
+services:
+
+  firmware-builder:
+    build: .
+    container_name: firmware-builder
+    volumes:
+      - ./release:/meterlogger/MeterLogger/release
+    restart: unless-stopped
+
+  firmware-watcher:
+    build: ./watcher
+    container_name: firmware-watcher
+    depends_on:
+      - firmware-builder
+    restart: unless-stopped
